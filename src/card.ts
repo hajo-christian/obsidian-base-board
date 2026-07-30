@@ -334,9 +334,12 @@ export class CardManager {
       const display = formatValueForChip(val);
       if (!display) continue;
 
+      const displayName =
+        val instanceof DateValue ? "" : this.view.config.getDisplayName(propId);
+
       chips.push({
         propId,
-        displayName: this.view.config.getDisplayName(propId),
+        displayName: displayName,
         display,
         val,
       });
