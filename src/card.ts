@@ -12,6 +12,7 @@ import {
   Value,
   Keymap,
   Platform,
+  moment,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
@@ -42,7 +43,12 @@ const IMAGE_EXTENSIONS = new Set([
 //   - everything else → toString() (existing behaviour)
 function formatValueForChip(val: Value): string {
   if (val instanceof DateValue) {
-    return val.relative();
+    const date = new Date(val.toString());
+    return date.toLocaleDateString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   }
   if (val instanceof LinkValue) {
     const raw = val.toString();
