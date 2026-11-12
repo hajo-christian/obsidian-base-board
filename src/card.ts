@@ -12,7 +12,6 @@ import {
   Value,
   Keymap,
   Platform,
-  moment,
 } from "obsidian";
 import { KanbanView } from "./kanban-view";
 import { ORDER_PROPERTY, sanitizeFilename } from "./constants";
@@ -438,6 +437,7 @@ export class CardManager {
         : null;
 
     return JSON.stringify({
+      calendarDay: new Date().toDateString(),
       path: file?.path ?? "",
       basename: file?.basename ?? "",
       cover,
@@ -462,6 +462,29 @@ export class CardManager {
     val?: Value,
   ): HTMLElement {
     const chip = parent.createSpan({ cls: "base-board-card-chip" });
+
+    // Datumswerte von heute oder aus der Vergangenheit markieren.
+    if (val instanceof DateValue) {
+      const raw = val.toString();
+
+      // Reine Datumswerte lokal interpretieren, um UTC-Verschiebungen
+      // durch new Date("YYYY-MM-DD") zu vermeiden.
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+        ? new Date(`${raw}T00:00:00`)
+        : new Date(raw);
+
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      if (
+        !Number.isNaN(date.getTime()) &&
+        date.getTime() < tomorrow.getTime()
+      ) {
+        chip.addClass("base-board-card-chip--due");
+      }
+    }
+
     if (propId) chip.setAttr("data-property-id", propId);
     chip.createSpan({ text: label, cls: "base-board-chip-label" });
     const valueEl = chip.createSpan({ cls: "base-board-chip-value" });
