@@ -3,10 +3,12 @@ import {
   BasesEntry,
   BasesEntryGroup,
   BasesAllOptions,
+  BooleanValue,
   HoverParent,
   HoverPopover,
-  QueryController,
+  NumberValue,
   NullValue,
+  QueryController,
   setIcon,
   TFile,
   WorkspaceLeaf,
@@ -23,6 +25,7 @@ import {
   OrderValue,
   readOrderValue,
 } from "./order";
+import { coerceColumnValue, GroupByValueType } from "./value-utils";
 import {
   NO_VALUE_COLUMN,
   ORDER_PROPERTY,
@@ -33,6 +36,7 @@ import {
   CONFIG_KEY_WIP_LIMITS,
   CONFIG_KEY_COVER_PROPERTY,
   CONFIG_KEY_ADD_TO_TOP,
+  VIEW_TYPE,
 } from "./constants";
 
 interface BoardScrollState {
@@ -46,7 +50,7 @@ interface BoardScrollState {
 // ---------------------------------------------------------------------------
 
 export class KanbanView extends BasesView implements HoverParent {
-  type = "kanban";
+  type = VIEW_TYPE;
   // Required by HoverParent — Obsidian manages the popover lifecycle.
   hoverPopover: HoverPopover | null = null;
   scrollEl: HTMLElement;
@@ -344,6 +348,40 @@ export class KanbanView extends BasesView implements HoverParent {
     if (typeof key === "string") return key;
     if (typeof key === "number" || typeof key === "boolean") return String(key);
     return "";
+  }
+
+  /**
+   * Infer the JS type of the groupBy property from the group keys that Bases
+   * actually produced. Bases exposes group keys as typed Value objects, so a
+   * checkbox-grouped board yields BooleanValue keys and a numeric one yields
+   * NumberValue keys. Booleans win outright so a mix of real checkboxes and
+   * already-corrupted "false" strings still resolves to "boolean".
+   */
+  private groupByValueType(): GroupByValueType {
+    for (const group of this.currentGroups) {
+      if (group.key instanceof BooleanValue) return "boolean";
+      if (group.key instanceof NumberValue) return "number";
+    }
+    return "other";
+  }
+
+  /**
+   * Write the groupBy property for a card into `fm`, preserving its real type.
+   *
+   * The "(No value)" column removes the property entirely; every other column
+   * stores a correctly-typed value so a checkbox `false` is never turned into
+   * the string "false" (which is truthy and breaks grouping).
+   */
+  public applyGroupByValue(
+    fm: Record<string, unknown>,
+    groupByProp: string,
+    columnName: string,
+  ): void {
+    if (columnName === NO_VALUE_COLUMN) {
+      delete fm[groupByProp];
+      return;
+    }
+    fm[groupByProp] = coerceColumnValue(columnName, this.groupByValueType());
   }
 
   /**
@@ -751,11 +789,7 @@ export class KanbanView extends BasesView implements HoverParent {
           return this.app.fileManager.processFrontMatter(
             file,
             (fm: Record<string, unknown>) => {
-              if (targetColumnName === NO_VALUE_COLUMN) {
-                delete fm[groupByProp];
-              } else {
-                fm[groupByProp] = targetColumnName;
-              }
+              this.applyGroupByValue(fm, groupByProp, targetColumnName);
             },
           );
         });
